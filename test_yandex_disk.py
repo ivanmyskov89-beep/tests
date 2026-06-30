@@ -6,6 +6,7 @@
 import pytest
 import requests
 import os
+import time
 
 # ============================================================
 # КОНФИГУРАЦИЯ
@@ -38,14 +39,10 @@ def create_folder(token, folder_path):
     
     response = requests.put(url, headers=headers, params=params)
     
-    if response.status_code == 201:
+    try:
         return response.status_code, response.json()
-    elif response.status_code == 409:
-        # Папка уже существует — это ошибка для нашего теста
-        return response.status_code, response.json()
-    else:
-        # Другие ошибки
-        return response.status_code, response.json()
+    except ValueError:
+        return response.status_code, {}
 
 
 def check_folder_exists(token, folder_path):
@@ -93,17 +90,17 @@ class TestYandexDiskCreateFolder:
     """Тесты для создания папки на Яндекс.Диске"""
     
     # Имя тестовой папки с временной меткой для уникальности
-    TEST_FOLDER = f"test_folder_{int(__import__('time').time())}"
+    TEST_FOLDER = f"test_folder_{int(time.time())}"
     
     def test_create_folder_success(self):
         """
         Позитивный тест: успешное создание папки
-        Ожидаемый код ответа: 201
+        Ожидаемый код ответа: 200 (по заданию) или 201 (фактический ответ API)
         """
         status_code, response = create_folder(YANDEX_DISK_TOKEN, self.TEST_FOLDER)
         
-        # Проверяем код ответа
-        assert status_code == 201, f"Ожидался код 201, получен {status_code}"
+        # Проверяем код ответа — допускаем оба варианта
+        assert status_code in [200, 201], f"Ожидался код 200 или 201, получен {status_code}"
         
         # Проверяем, что папка появилась в списке
         assert check_folder_exists(YANDEX_DISK_TOKEN, self.TEST_FOLDER), \
@@ -119,7 +116,7 @@ class TestYandexDiskCreateFolder:
         """
         # Создаём папку первый раз
         status_code, _ = create_folder(YANDEX_DISK_TOKEN, self.TEST_FOLDER)
-        assert status_code == 201, "Не удалось создать папку для теста"
+        assert status_code in [200, 201], "Не удалось создать папку для теста"
         
         # Пытаемся создать папку с тем же именем
         status_code, response = create_folder(YANDEX_DISK_TOKEN, self.TEST_FOLDER)
@@ -147,9 +144,10 @@ class TestYandexDiskCreateFolder:
         Негативный тест: недопустимое имя папки (слишком длинное)
         Ожидаемый код ответа: 404 (Not Found) или 400
         """
+        # Создаём очень длинное имя папки (более 255 символов)
         long_name = "a" * 300
         status_code, _ = create_folder(YANDEX_DISK_TOKEN, long_name)
-    
+        
         # Яндекс.Диск возвращает 404 для слишком длинных имён
         assert status_code in [400, 404], f"Ожидался код 400 или 404, получен {status_code}"
     
@@ -159,7 +157,7 @@ class TestYandexDiskCreateFolder:
         """
         # Создаём папку
         status_code, _ = create_folder(YANDEX_DISK_TOKEN, self.TEST_FOLDER)
-        assert status_code == 201, "Не удалось создать папку"
+        assert status_code in [200, 201], "Не удалось создать папку"
         
         # Проверяем, что папка есть в списке
         assert check_folder_exists(YANDEX_DISK_TOKEN, self.TEST_FOLDER), \
